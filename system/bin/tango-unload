@@ -1,0 +1,45 @@
+#!/system/bin/sh
+# Unload tango32 kernel module
+
+TANGO32_DEV="/dev/tango32"
+
+if [ ! -e "$TANGO32_DEV" ]; then
+    echo "tango32 kernel module is not loaded"
+    exit 0
+fi
+
+# Kill any processes using the device
+echo "Checking for processes using $TANGO32_DEV..."
+pids=$(lsof "$TANGO32_DEV" 2>/dev/null | grep -v "^COMMAND" | awk '{print $2}' | sort -u)
+if [ -n "$pids" ]; then
+    echo "Killing processes: $pids"
+    for pid in $pids; do
+        if [ "$pid" != "1" ] && [ "$pid" != "$$" ]; then
+            kill -TERM "$pid" 2>/dev/null
+        fi
+    done
+    sleep 1
+    for pid in $pids; do
+        if [ "$pid" != "1" ] && [ "$pid" != "$$" ] && kill -0 "$pid" 2>/dev/null; then
+            kill -KILL "$pid" 2>/dev/null
+        fi
+    done
+    sleep 0.5
+fi
+
+# Unregister binfmt_misc
+if [ -f /proc/sys/fs/binfmt_misc/tango32 ]; then
+    echo -1 > /proc/sys/fs/binfmt_misc/tango32 2>/dev/null
+fi
+
+# Unload module
+rmmod tango32 2>/dev/null || rmmod -f tango32 2>/dev/null
+sleep 0.5
+
+if ! lsmod 2>/dev/null | grep -q "^tango32 "; then
+    echo "tango32 kernel module unloaded successfully"
+else
+    echo "ERROR: Failed to unload tango32 kernel module"
+    echo "Some process may still be using it"
+    exit 1
+fi

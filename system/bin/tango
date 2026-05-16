@@ -1,0 +1,20 @@
+#!/system/bin/sh
+# Tango Binary Translator wrapper
+# Auto-loads tango32 if not already loaded, then runs ARM32 binary
+
+TANGO32_DEV="/dev/tango32"
+
+# Check if tango32 module is loaded
+if [ ! -e "$TANGO32_DEV" ]; then
+    echo "Tango32 kernel module not loaded. Loading..."
+    /system/bin/tango-load 2>/dev/null
+    
+    if [ ! -e "$TANGO32_DEV" ]; then
+        echo "ERROR: Failed to load tango32 kernel module"
+        echo "Use the KernelSU Manager WebUI to enable it, or run: tango-load"
+        exit 1
+    fi
+fi
+
+# Run the actual translator with all arguments
+exec /system/bin/tango_translator "$@"

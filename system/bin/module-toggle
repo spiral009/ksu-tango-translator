@@ -1,0 +1,142 @@
+#!/system/bin/sh
+# Toggle kernel module load/unload with persistence
+# Usage: module-toggle <module-name> [enable|disable|status]
+
+MODULE="$1"
+ACTION="$2"
+CONFIG_DIR="/data/adb/tango-modules"
+DISABLE_FILE="$CONFIG_DIR/disabled.conf"
+
+if [ -z "$MODULE" ]; then
+    echo "Usage: module-toggle <module-name> [enable|disable|status]"
+    exit 1
+fi
+
+# Normalize module name
+module_name="${MODULE%.ko}"
+
+# Device node path
+case "$module_name" in
+    tango32)
+        dev_node="/dev/tango32"
+        ;;
+    ntsync)
+        dev_node="/dev/ntsync"
+        ;;
+    *)
+        dev_node=""
+        ;;
+esac
+
+# Check if module is currently loaded
+check_loaded() {
+    lsmod 2>/dev/null | grep -q "^${module_name} "
+}
+
+# Check if module is disabled for next boot
+check_disabled() {
+    [ -f "$DISABLE_FILE" ] && grep -q "^${module_name}$" "$DISABLE_FILE"
+}
+
+# Kill processes using the device node
+kill_users() {
+    if [ -n "$dev_node" ] && [ -e "$dev_node" ]; then
+        # Find PIDs using the device
+        local pids=$(lsof "$dev_node" 2>/dev/null | grep -v "^COMMAND" | awk '{print $2}' | sort -u)
+        if [ -n "$pids" ]; then
+            echo "Killing processes using $dev_node: $pids"
+            for pid in $pids; do
+                # Don't kill ourselves or init
+                if [ "$pid" != "1" ] && [ "$pid" != "$$" ]; then
+                    kill -TERM "$pid" 2>/dev/null
+                fi
+            done
+            # Wait for processes to exit
+            sleep 1
+            # Force kill any stragglers
+            for pid in $pids; do
+                if [ "$pid" != "1" ] && [ "$pid" != "$$" ] && kill -0 "$pid" 2>/dev/null; then
+                    kill -KILL "$pid" 2>/dev/null
+                fi
+            done
+            sleep 0.5
+        fi
+    fi
+}
+
+# Enable module (load now + enable for next boot)
+enable_module() {
+    # Remove from disable list
+    if [ -f "$DISABLE_FILE" ]; then
+        grep -v "^${module_name}$" "$DISABLE_FILE" > "${DISABLE_FILE}.tmp" 2>/dev/null
+        mv "${DISABLE_FILE}.tmp" "$DISABLE_FILE" 2>/dev/null
+    fi
+    
+    # Load if not already loaded
+    if ! check_loaded; then
+        if [ -f "/vendor_dlkm/${module_name}.ko" ]; then
+            insmod "/vendor_dlkm/${module_name}.ko" 2>/dev/null || modprobe "$module_name" 2>/dev/null
+        else
+            modprobe "$module_name" 2>/dev/null
+        fi
+        sleep 0.3
+    fi
+    
+    if check_loaded; then
+        echo "enabled"
+    else
+        echo "error"
+    fi
+}
+
+# Disable module (kill users, unload now + disable for next boot)
+disable_module() {
+    # Add to disable list
+    if ! check_disabled; then
+        echo "$module_name" >> "$DISABLE_FILE"
+    fi
+    
+    # Kill any processes using the device before unloading
+    kill_users
+    
+    # Unload if loaded
+    if check_loaded; then
+        rmmod "$module_name" 2>/dev/null || rmmod -f "$module_name" 2>/dev/null
+        sleep 0.3
+    fi
+    
+    if ! check_loaded; then
+        echo "disabled"
+    else
+        echo "error"
+    fi
+}
+
+# Get status
+get_status() {
+    if check_loaded; then
+        if check_disabled; then
+            echo "loaded-but-disabled"
+        else
+            echo "loaded"
+        fi
+    else
+        if check_disabled; then
+            echo "disabled"
+        else
+            echo "unloaded"
+        fi
+    fi
+}
+
+case "$ACTION" in
+    enable)
+        enable_module
+        ;;
+    disable)
+        disable_module
+        ;;
+    status|*)
+        get_status
+        ;;
+esac

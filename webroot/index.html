@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tango Binary Translator</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0a0a0a;
+            color: #e0e0e0;
+            padding: 20px;
+            min-height: 100vh;
+        }
+        .container { max-width: 600px; margin: 0 auto; }
+        h1 { color: #4fc3f7; margin-bottom: 4px; font-size: 24px; }
+        .subtitle { color: #666; margin-bottom: 24px; font-size: 14px; }
+        
+        .module-card {
+            background: #141414;
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 16px;
+            border: 1px solid #222;
+        }
+        .module-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+        .module-name {
+            font-size: 18px;
+            font-weight: 600;
+            color: #fff;
+        }
+        .module-desc {
+            font-size: 13px;
+            color: #888;
+            margin-top: 2px;
+        }
+        
+        .toggle-switch {
+            position: relative;
+            width: 56px;
+            height: 32px;
+        }
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #333;
+            transition: .3s;
+            border-radius: 32px;
+        }
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 24px;
+            width: 24px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .3s;
+            border-radius: 50%;
+        }
+        input:checked + .slider {
+            background-color: #4caf50;
+        }
+        input:checked + .slider:before {
+            transform: translateX(24px);
+        }
+        input:disabled + .slider {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .status-row {
+            display: flex;
+            gap: 16px;
+        }
+        .status-item {
+            flex: 1;
+            background: #1a1a1a;
+            border-radius: 10px;
+            padding: 12px;
+            text-align: center;
+        }
+        .status-label {
+            font-size: 11px;
+            text-transform: uppercase;
+            color: #666;
+            margin-bottom: 4px;
+            letter-spacing: 0.5px;
+        }
+        .status-value {
+            font-size: 15px;
+            font-weight: 600;
+        }
+        .status-on { color: #4caf50; }
+        .status-off { color: #f44336; }
+        .status-warn { color: #ff9800; }
+        
+        .info-card {
+            background: #141414;
+            border-radius: 16px;
+            padding: 20px;
+            margin-top: 16px;
+            border: 1px solid #222;
+        }
+        .info-title {
+            font-size: 12px;
+            text-transform: uppercase;
+            color: #666;
+            margin-bottom: 12px;
+            letter-spacing: 1px;
+        }
+        .info-text {
+            font-size: 14px;
+            line-height: 1.6;
+            color: #aaa;
+        }
+        code {
+            background: #1f1f1f;
+            padding: 2px 8px;
+            border-radius: 6px;
+            font-family: 'SF Mono', 'Courier New', monospace;
+            font-size: 12px;
+            color: #4fc3f7;
+        }
+        .divider {
+            height: 1px;
+            background: #222;
+            margin: 16px 0;
+        }
+        #log-output {
+            font-family: 'SF Mono', 'Courier New', monospace;
+            font-size: 12px;
+            line-height: 1.5;
+            color: #888;
+            white-space: pre-wrap;
+            word-break: break-all;
+            max-height: 150px;
+            overflow-y: auto;
+            background: #0d0d0d;
+            padding: 12px;
+            border-radius: 8px;
+            margin-top: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Tango Binary Translator</h1>
+        <p class="subtitle">Run ARM32 binaries on ARM64-only devices</p>
+
+        <div class="module-card">
+            <div class="module-header">
+                <div>
+                    <div class="module-name">tango32</div>
+                    <div class="module-desc">ARM32 syscall translation for Tango</div>
+                </div>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="toggle-tango32" onchange="toggleModule('tango32')">
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <div class="status-row">
+                <div class="status-item">
+                    <div class="status-label">Current</div>
+                    <div id="status-tango32-current" class="status-value status-off">—</div>
+                </div>
+                <div class="status-item">
+                    <div class="status-label">Next Boot</div>
+                    <div id="status-tango32-boot" class="status-value status-off">—</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="module-card">
+            <div class="module-header">
+                <div>
+                    <div class="module-name">ntsync</div>
+                    <div class="module-desc">Windows sync primitives for Wine/Proton</div>
+                </div>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="toggle-ntsync" onchange="toggleModule('ntsync')">
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <div class="status-row">
+                <div class="status-item">
+                    <div class="status-label">Current</div>
+                    <div id="status-ntsync-current" class="status-value status-off">—</div>
+                </div>
+                <div class="status-item">
+                    <div class="status-label">Next Boot</div>
+                    <div id="status-ntsync-boot" class="status-value status-off">—</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="info-card">
+            <div class="info-title">Usage</div>
+            <div class="info-text">
+                <p><strong>ARM32 CLI:</strong> <code>tango /path/to/arm32-binary [args...]</code></p>
+                <p><strong>Direct:</strong> <code>/system/bin/tango_translator /path/to/binary</code></p>
+                <p><strong>Pretranslate:</strong> <code>tango-pretranslate --apk -i &lt;bin&gt; -o &lt;bin&gt;.tango</code></p>
+                <div class="divider"></div>
+                <p style="color:#666;font-size:12px;">
+                    Both modules auto-load at boot by default. Toggle off to unload and skip next boot. 
+                    Toggle on to load instantly and enable for next boot.
+                </p>
+            </div>
+            <div id="log-output">Ready...</div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { exec, toast } from 'kernelsu';
+
+        async function runCmd(cmd) {
+            try {
+                const { errno, stdout, stderr } = await exec(cmd);
+                return { ok: errno === 0, out: stdout || stderr || `code ${errno}` };
+            } catch (e) {
+                return { ok: false, out: e.message };
+            }
+        }
+
+        function setText(id, text, cls) {
+            const el = document.getElementById(id);
+            el.textContent = text;
+            el.className = 'status-value ' + (cls || '');
+        }
+
+        function log(msg) {
+            document.getElementById('log-output').textContent = msg;
+        }
+
+        async function refreshStatus() {
+            // tango32
+            const t32 = await runCmd('module-toggle tango32 status');
+            const t32st = t32.out.trim();
+            const t32Loaded = t32st === 'loaded' || t32st === 'loaded-but-disabled';
+            const t32Enabled = t32st === 'loaded' || t32st === 'unloaded';
+            
+            document.getElementById('toggle-tango32').checked = t32Enabled;
+            
+            if (t32st === 'loaded') {
+                setText('status-tango32-current', 'Loaded', 'status-on');
+                setText('status-tango32-boot', 'Will Load', 'status-on');
+            } else if (t32st === 'disabled') {
+                setText('status-tango32-current', 'Unloaded', 'status-off');
+                setText('status-tango32-boot', 'Won\'t Load', 'status-off');
+            } else if (t32st === 'loaded-but-disabled') {
+                setText('status-tango32-current', 'Loaded', 'status-on');
+                setText('status-tango32-boot', 'Won\'t Load', 'status-warn');
+            } else {
+                setText('status-tango32-current', 'Unloaded', 'status-off');
+                setText('status-tango32-boot', 'Will Load', 'status-on');
+            }
+
+            // ntsync
+            const nts = await runCmd('module-toggle ntsync status');
+            const ntsst = nts.out.trim();
+            const ntsLoaded = ntsst === 'loaded' || ntsst === 'loaded-but-disabled';
+            const ntsEnabled = ntsst === 'loaded' || ntsst === 'unloaded';
+            
+            document.getElementById('toggle-ntsync').checked = ntsEnabled;
+            
+            if (ntsst === 'loaded') {
+                setText('status-ntsync-current', 'Loaded', 'status-on');
+                setText('status-ntsync-boot', 'Will Load', 'status-on');
+            } else if (ntsst === 'disabled') {
+                setText('status-ntsync-current', 'Unloaded', 'status-off');
+                setText('status-ntsync-boot', 'Won\'t Load', 'status-off');
+            } else if (ntsst === 'loaded-but-disabled') {
+                setText('status-ntsync-current', 'Loaded', 'status-on');
+                setText('status-ntsync-boot', 'Won\'t Load', 'status-warn');
+            } else {
+                setText('status-ntsync-current', 'Unloaded', 'status-off');
+                setText('status-ntsync-boot', 'Will Load', 'status-on');
+            }
+        }
+
+        window.toggleModule = async function(name) {
+            const checkbox = document.getElementById('toggle-' + name);
+            checkbox.disabled = true;
+            
+            const action = checkbox.checked ? 'enable' : 'disable';
+            log(`${action === 'enable' ? 'Loading' : 'Unloading'} ${name}...`);
+            
+            const result = await runCmd(`module-toggle ${name} ${action}`);
+            log(result.out);
+            
+            if (result.ok) {
+                toast(`${name} ${action}d`);
+            } else {
+                toast(`Failed to ${action} ${name}`);
+                checkbox.checked = !checkbox.checked;
+            }
+            
+            checkbox.disabled = false;
+            await refreshStatus();
+        };
+
+        // Initial refresh
+        refreshStatus();
+    </script>
+</body>
+</html>
