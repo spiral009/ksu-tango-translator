@@ -1,7 +1,7 @@
 id=tango-translator
 name=Tango Binary Translator
-version=v2.1.1
-versionCode=2110
+version=v2.1.2
+versionCode=2112
 author=Amanieu d'Antras
 minKernelVersion=5.6
 description=KernelSU module for Tango binary translator - enables ARM32 CLI tools on ARM64-only devices

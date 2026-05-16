@@ -209,14 +209,16 @@
                 const { errno, stdout, stderr } = await exec(cmd);
                 return { ok: errno === 0, out: stdout || stderr || `code ${errno}` };
             } catch (e) {
-                return { ok: false, out: e.message };
+                return { ok: false, out: e.message || 'Unknown error' };
             }
         }
 
         function setText(id, text, cls) {
             const el = document.getElementById(id);
-            el.textContent = text;
-            el.className = 'status-value ' + (cls || '');
+            if (el) {
+                el.textContent = text;
+                el.className = 'status-value ' + (cls || '');
+            }
         }
 
         function log(msg) {
@@ -224,11 +226,16 @@
         }
 
         async function refreshStatus() {
+            log('Checking status...');
+
             // tango32
-            const t32 = await runCmd('module-toggle tango32 status');
+            const t32 = await runCmd('/system/bin/module-toggle tango32 status');
             const t32st = t32.out.trim();
-            const t32Enabled = t32st === 'loaded' || t32st === 'unloaded';
             
+            log(`tango32 status: ${t32st} (ok=${t32.ok})`);
+            
+            // Checkbox: checked if enabled for next boot (not disabled)
+            const t32Enabled = t32st !== 'disabled' && t32st !== 'loaded-but-disabled';
             document.getElementById('toggle-tango32').checked = t32Enabled;
             
             if (t32st === 'loaded') {
@@ -240,16 +247,23 @@
             } else if (t32st === 'loaded-but-disabled') {
                 setText('status-tango32-current', 'Loaded', 'status-on');
                 setText('status-tango32-boot', "Won't Load", 'status-warn');
-            } else {
+            } else if (t32st === 'unloaded') {
                 setText('status-tango32-current', 'Unloaded', 'status-off');
                 setText('status-tango32-boot', 'Will Load', 'status-on');
+            } else {
+                // Unknown status - show error
+                setText('status-tango32-current', 'Error', 'status-off');
+                setText('status-tango32-boot', 'Unknown', 'status-off');
+                log(`tango32: unexpected status "${t32st}"`);
             }
 
             // ntsync
-            const nts = await runCmd('module-toggle ntsync status');
+            const nts = await runCmd('/system/bin/module-toggle ntsync status');
             const ntsst = nts.out.trim();
-            const ntsEnabled = ntsst === 'loaded' || ntsst === 'unloaded';
             
+            log(`ntsync status: ${ntsst} (ok=${nts.ok})`);
+            
+            const ntsEnabled = ntsst !== 'disabled' && ntsst !== 'loaded-but-disabled';
             document.getElementById('toggle-ntsync').checked = ntsEnabled;
             
             if (ntsst === 'loaded') {
@@ -261,9 +275,13 @@
             } else if (ntsst === 'loaded-but-disabled') {
                 setText('status-ntsync-current', 'Loaded', 'status-on');
                 setText('status-ntsync-boot', "Won't Load", 'status-warn');
-            } else {
+            } else if (ntsst === 'unloaded') {
                 setText('status-ntsync-current', 'Unloaded', 'status-off');
                 setText('status-ntsync-boot', 'Will Load', 'status-on');
+            } else {
+                setText('status-ntsync-current', 'Error', 'status-off');
+                setText('status-ntsync-boot', 'Unknown', 'status-off');
+                log(`ntsync: unexpected status "${ntsst}"`);
             }
         }
 
@@ -274,7 +292,7 @@
             const action = checkbox.checked ? 'enable' : 'disable';
             log(`${action === 'enable' ? 'Loading' : 'Unloading'} ${name}...`);
             
-            const result = await runCmd(`module-toggle ${name} ${action}`);
+            const result = await runCmd(`/system/bin/module-toggle ${name} ${action}`);
             log(result.out);
             
             if (result.ok) {
@@ -288,8 +306,8 @@
             await refreshStatus();
         };
 
-        // Initial refresh
-        refreshStatus();
+        // Initial refresh with delay to ensure DOM is ready
+        setTimeout(refreshStatus, 100);
     </script>
 </body>
 </html>
