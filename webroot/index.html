@@ -30,16 +30,8 @@
             align-items: center;
             margin-bottom: 16px;
         }
-        .module-name {
-            font-size: 18px;
-            font-weight: 600;
-            color: #fff;
-        }
-        .module-desc {
-            font-size: 13px;
-            color: #888;
-            margin-top: 2px;
-        }
+        .module-name { font-size: 18px; font-weight: 600; color: #fff; }
+        .module-desc { font-size: 13px; color: #888; margin-top: 2px; }
         
         .toggle-switch {
             position: relative;
@@ -70,21 +62,11 @@
             transition: .3s;
             border-radius: 50%;
         }
-        input:checked + .slider {
-            background-color: #4caf50;
-        }
-        input:checked + .slider:before {
-            transform: translateX(24px);
-        }
-        input:disabled + .slider {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
+        input:checked + .slider { background-color: #4caf50; }
+        input:checked + .slider:before { transform: translateX(24px); }
+        input:disabled + .slider { opacity: 0.5; cursor: not-allowed; }
         
-        .status-row {
-            display: flex;
-            gap: 16px;
-        }
+        .status-row { display: flex; gap: 16px; }
         .status-item {
             flex: 1;
             background: #1a1a1a;
@@ -99,10 +81,7 @@
             margin-bottom: 4px;
             letter-spacing: 0.5px;
         }
-        .status-value {
-            font-size: 15px;
-            font-weight: 600;
-        }
+        .status-value { font-size: 15px; font-weight: 600; }
         .status-on { color: #4caf50; }
         .status-off { color: #f44336; }
         .status-warn { color: #ff9800; }
@@ -164,7 +143,7 @@
             <div class="module-header">
                 <div>
                     <div class="module-name">tango32</div>
-                    <div class="module-desc">ARM32 syscall translation for Tango</div>
+                    <div class="module-desc">ARM32 syscall translation + binfmt_misc</div>
                 </div>
                 <label class="toggle-switch">
                     <input type="checkbox" id="toggle-tango32" onchange="toggleModule('tango32')">
@@ -210,7 +189,7 @@
             <div class="info-title">Usage</div>
             <div class="info-text">
                 <p><strong>ARM32 CLI:</strong> <code>tango /path/to/arm32-binary [args...]</code></p>
-                <p><strong>Direct:</strong> <code>/system/bin/tango_translator /path/to/binary</code></p>
+                <p><strong>Direct:</strong> Run ARM32 binaries directly when tango32 is enabled</p>
                 <p><strong>Pretranslate:</strong> <code>tango-pretranslate --apk -i &lt;bin&gt; -o &lt;bin&gt;.tango</code></p>
                 <div class="divider"></div>
                 <p style="color:#666;font-size:12px;">
@@ -248,7 +227,6 @@
             // tango32
             const t32 = await runCmd('module-toggle tango32 status');
             const t32st = t32.out.trim();
-            const t32Loaded = t32st === 'loaded' || t32st === 'loaded-but-disabled';
             const t32Enabled = t32st === 'loaded' || t32st === 'unloaded';
             
             document.getElementById('toggle-tango32').checked = t32Enabled;
@@ -258,10 +236,10 @@
                 setText('status-tango32-boot', 'Will Load', 'status-on');
             } else if (t32st === 'disabled') {
                 setText('status-tango32-current', 'Unloaded', 'status-off');
-                setText('status-tango32-boot', 'Won\'t Load', 'status-off');
+                setText('status-tango32-boot', "Won't Load", 'status-off');
             } else if (t32st === 'loaded-but-disabled') {
                 setText('status-tango32-current', 'Loaded', 'status-on');
-                setText('status-tango32-boot', 'Won\'t Load', 'status-warn');
+                setText('status-tango32-boot', "Won't Load", 'status-warn');
             } else {
                 setText('status-tango32-current', 'Unloaded', 'status-off');
                 setText('status-tango32-boot', 'Will Load', 'status-on');
@@ -270,7 +248,6 @@
             // ntsync
             const nts = await runCmd('module-toggle ntsync status');
             const ntsst = nts.out.trim();
-            const ntsLoaded = ntsst === 'loaded' || ntsst === 'loaded-but-disabled';
             const ntsEnabled = ntsst === 'loaded' || ntsst === 'unloaded';
             
             document.getElementById('toggle-ntsync').checked = ntsEnabled;
@@ -280,10 +257,10 @@
                 setText('status-ntsync-boot', 'Will Load', 'status-on');
             } else if (ntsst === 'disabled') {
                 setText('status-ntsync-current', 'Unloaded', 'status-off');
-                setText('status-ntsync-boot', 'Won\'t Load', 'status-off');
+                setText('status-ntsync-boot', "Won't Load", 'status-off');
             } else if (ntsst === 'loaded-but-disabled') {
                 setText('status-ntsync-current', 'Loaded', 'status-on');
-                setText('status-ntsync-boot', 'Won\'t Load', 'status-warn');
+                setText('status-ntsync-boot', "Won't Load", 'status-warn');
             } else {
                 setText('status-ntsync-current', 'Unloaded', 'status-off');
                 setText('status-ntsync-boot', 'Will Load', 'status-on');

@@ -6,6 +6,7 @@ MODULE="$1"
 ACTION="$2"
 CONFIG_DIR="/data/adb/tango-modules"
 DISABLE_FILE="$CONFIG_DIR/disabled.conf"
+BINFMT_ENTRY="tango_translator"
 
 if [ -z "$MODULE" ]; then
     echo "Usage: module-toggle <module-name> [enable|disable|status]"
@@ -28,6 +29,59 @@ case "$module_name" in
         ;;
 esac
 
+# Mount binfmt_misc if not mounted
+mount_binfmt_misc() {
+    if [ -d /proc/sys/fs/binfmt_misc ]; then
+        if [ ! -f /proc/sys/fs/binfmt_misc/register ]; then
+            mount -t binfmt_misc none /proc/sys/fs/binfmt_misc 2>/dev/null || true
+        fi
+    fi
+}
+
+# Register binfmt_misc for ARM32 ELF
+register_binfmt() {
+    mount_binfmt_misc
+    if [ -f /proc/sys/fs/binfmt_misc/register ]; then
+        if [ ! -f /proc/sys/fs/binfmt_misc/$BINFMT_ENTRY ]; then
+            echo ':tango_translator:M::\x7fELF\x01\x01\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x02\x00\x28\x00:\xff\xff\xff\xff\xff\xff\xff\x00\x00\x00\x00\x00\x00\x00\x00\x00\xfe\xff\xff\xff:/system/bin/tango_translator:POCF' > /proc/sys/fs/binfmt_misc/register 2>/dev/null || true
+        fi
+        # Enable it
+        if [ -f /proc/sys/fs/binfmt_misc/$BINFMT_ENTRY ]; then
+            echo 1 > /proc/sys/fs/binfmt_misc/$BINFMT_ENTRY 2>/dev/null || true
+        fi
+    fi
+}
+
+# Unregister binfmt_misc
+unregister_binfmt() {
+    if [ -f /proc/sys/fs/binfmt_misc/$BINFMT_ENTRY ]; then
+        echo 0 > /proc/sys/fs/binfmt_misc/$BINFMT_ENTRY 2>/dev/null || true
+        sleep 0.1
+        echo -1 > /proc/sys/fs/binfmt_misc/$BINFMT_ENTRY 2>/dev/null || true
+    fi
+}
+
+# Kill processes using the device node
+kill_device_users() {
+    local dev="$1"
+    local pids=$(lsof "$dev" 2>/dev/null | grep -v "^COMMAND" | awk '{print $2}' | sort -u)
+    if [ -n "$pids" ]; then
+        echo "Killing processes using $dev: $pids"
+        for pid in $pids; do
+            if [ "$pid" != "1" ] && [ "$pid" != "$$" ]; then
+                kill -TERM "$pid" 2>/dev/null || true
+            fi
+        done
+        sleep 1
+        for pid in $pids; do
+            if [ "$pid" != "1" ] && [ "$pid" != "$$" ] && kill -0 "$pid" 2>/dev/null; then
+                kill -KILL "$pid" 2>/dev/null || true
+            fi
+        done
+        sleep 0.5
+    fi
+}
+
 # Check if module is currently loaded
 check_loaded() {
     lsmod 2>/dev/null | grep -q "^${module_name} "
@@ -38,48 +92,27 @@ check_disabled() {
     [ -f "$DISABLE_FILE" ] && grep -q "^${module_name}$" "$DISABLE_FILE"
 }
 
-# Kill processes using the device node
-kill_users() {
-    if [ -n "$dev_node" ] && [ -e "$dev_node" ]; then
-        # Find PIDs using the device
-        local pids=$(lsof "$dev_node" 2>/dev/null | grep -v "^COMMAND" | awk '{print $2}' | sort -u)
-        if [ -n "$pids" ]; then
-            echo "Killing processes using $dev_node: $pids"
-            for pid in $pids; do
-                # Don't kill ourselves or init
-                if [ "$pid" != "1" ] && [ "$pid" != "$$" ]; then
-                    kill -TERM "$pid" 2>/dev/null
-                fi
-            done
-            # Wait for processes to exit
-            sleep 1
-            # Force kill any stragglers
-            for pid in $pids; do
-                if [ "$pid" != "1" ] && [ "$pid" != "$$" ] && kill -0 "$pid" 2>/dev/null; then
-                    kill -KILL "$pid" 2>/dev/null
-                fi
-            done
-            sleep 0.5
-        fi
-    fi
-}
-
 # Enable module (load now + enable for next boot)
 enable_module() {
     # Remove from disable list
     if [ -f "$DISABLE_FILE" ]; then
         grep -v "^${module_name}$" "$DISABLE_FILE" > "${DISABLE_FILE}.tmp" 2>/dev/null
-        mv "${DISABLE_FILE}.tmp" "$DISABLE_FILE" 2>/dev/null
+        mv "${DISABLE_FILE}.tmp" "$DISABLE_FILE" 2>/dev/null || true
     fi
     
     # Load if not already loaded
     if ! check_loaded; then
         if [ -f "/vendor_dlkm/${module_name}.ko" ]; then
-            insmod "/vendor_dlkm/${module_name}.ko" 2>/dev/null || modprobe "$module_name" 2>/dev/null
+            insmod "/vendor_dlkm/${module_name}.ko" 2>/dev/null || modprobe "$module_name" 2>/dev/null || true
         else
-            modprobe "$module_name" 2>/dev/null
+            modprobe "$module_name" 2>/dev/null || true
         fi
-        sleep 0.3
+        sleep 0.5
+    fi
+    
+    # Register binfmt_misc for tango32
+    if [ "$module_name" = "tango32" ] && check_loaded; then
+        register_binfmt
     fi
     
     if check_loaded; then
@@ -97,11 +130,16 @@ disable_module() {
     fi
     
     # Kill any processes using the device before unloading
-    kill_users
+    [ -n "$dev_node" ] && [ -e "$dev_node" ] && kill_device_users "$dev_node"
+    
+    # Unregister binfmt_misc for tango32
+    if [ "$module_name" = "tango32" ]; then
+        unregister_binfmt
+    fi
     
     # Unload if loaded
     if check_loaded; then
-        rmmod "$module_name" 2>/dev/null || rmmod -f "$module_name" 2>/dev/null
+        rmmod "$module_name" 2>/dev/null || rmmod -f "$module_name" 2>/dev/null || true
         sleep 0.3
     fi
     

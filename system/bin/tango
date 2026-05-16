@@ -7,13 +7,14 @@ TANGO32_DEV="/dev/tango32"
 # Check if tango32 module is loaded
 if [ ! -e "$TANGO32_DEV" ]; then
     echo "Tango32 kernel module not loaded. Loading..."
-    /system/bin/tango-load 2>/dev/null
+    /system/bin/module-toggle tango32 enable >/dev/null 2>&1
     
     if [ ! -e "$TANGO32_DEV" ]; then
         echo "ERROR: Failed to load tango32 kernel module"
-        echo "Use the KernelSU Manager WebUI to enable it, or run: tango-load"
+        echo "Use the KernelSU Manager WebUI to enable it"
         exit 1
     fi
+    echo "Tango32 kernel module loaded successfully"
 fi
 
 # Run the actual translator with all arguments

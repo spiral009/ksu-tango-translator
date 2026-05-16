@@ -1,22 +1,21 @@
 id=tango-translator
 name=Tango Binary Translator
-version=v2.1.0
-versionCode=2100
+version=v2.1.1
+versionCode=2110
 author=Amanieu d'Antras
 minKernelVersion=5.6
-description=KernelSU module for Tango binary translator - enables ARM32 CLI tools on ARM64-only devices without modifying ROM
+description=KernelSU module for Tango binary translator - enables ARM32 CLI tools on ARM64-only devices
 
 # This module provides:
 # - tango_translator binary for ARM32→ARM64 translation
-# - tango-pretranslate for ahead-of-time translation
+# - tango-pretranslate for ahead-of-time translation  
+# - ARM32 Bionic libraries and linker
 # - Runtime toggles for tango32 and ntsync kernel modules
-# - binfmt_misc auto-registration for ARM32 ELF files
+# - binfmt_misc registration for ARM32 ELF files
 # 
 # Requirements:
 # - tango32 and ntsync kernel modules in /vendor_dlkm/
-# - Standard ARM32 Bionic libraries (already in /system/lib/)
 # 
 # Usage:
 # tango <arm32-binary> [args...]
-# Or directly:
-# /system/bin/tango_translator /path/to/arm32-binary [args...]
+# Or run ARM32 binaries directly once enabled
