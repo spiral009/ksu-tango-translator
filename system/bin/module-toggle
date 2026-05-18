@@ -1,180 +1,87 @@
 #!/system/bin/sh
-# Toggle kernel module load/unload with persistence
-# Usage: module-toggle <module-name> [enable|disable|status]
+# Simple module toggle - v2.2.0
+# Usage: module-toggle [enable|disable|status]
 
-MODULE="$1"
-ACTION="$2"
-CONFIG_DIR="/data/adb/tango-modules"
-DISABLE_FILE="$CONFIG_DIR/disabled.conf"
-BINFMT_ENTRY="tango_translator"
+STATE_FILE="/data/adb/tango-modules/enabled"
 
-if [ -z "$MODULE" ]; then
-    echo "Usage: module-toggle <module-name> [enable|disable|status]"
-    exit 1
-fi
+# Ensure state file exists
+mkdir -p "$(dirname "$STATE_FILE")"
+[ -f "$STATE_FILE" ] || echo "0" > "$STATE_FILE"
 
-# Normalize module name
-module_name="${MODULE%.ko}"
-
-# Device node path
-case "$module_name" in
-    tango32)
-        dev_node="/dev/tango32"
-        ;;
-    ntsync)
-        dev_node="/dev/ntsync"
-        ;;
-    *)
-        dev_node=""
-        ;;
-esac
-
-# Mount binfmt_misc if not mounted
-mount_binfmt_misc() {
-    if [ -d /proc/sys/fs/binfmt_misc ]; then
-        if [ ! -f /proc/sys/fs/binfmt_misc/register ]; then
-            mount -t binfmt_misc none /proc/sys/fs/binfmt_misc 2>/dev/null || true
-        fi
-    fi
+is_loaded() {
+    lsmod 2>/dev/null | grep -q "^$1 "
 }
 
-# Register binfmt_misc for ARM32 ELF
-register_binfmt() {
-    mount_binfmt_misc
-    if [ -f /proc/sys/fs/binfmt_misc/register ]; then
-        if [ ! -f /proc/sys/fs/binfmt_misc/$BINFMT_ENTRY ]; then
-            echo ':tango_translator:M::\x7fELF\x01\x01\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x02\x00\x28\x00:\xff\xff\xff\xff\xff\xff\xff\x00\x00\x00\x00\x00\x00\x00\x00\x00\xfe\xff\xff\xff:/system/bin/tango_translator:POCF' > /proc/sys/fs/binfmt_misc/register 2>/dev/null || true
-        fi
-        # Enable it
-        if [ -f /proc/sys/fs/binfmt_misc/$BINFMT_ENTRY ]; then
-            echo 1 > /proc/sys/fs/binfmt_misc/$BINFMT_ENTRY 2>/dev/null || true
-        fi
-    fi
-}
-
-# Unregister binfmt_misc
-unregister_binfmt() {
-    if [ -f /proc/sys/fs/binfmt_misc/$BINFMT_ENTRY ]; then
-        echo 0 > /proc/sys/fs/binfmt_misc/$BINFMT_ENTRY 2>/dev/null || true
-        sleep 0.1
-        echo -1 > /proc/sys/fs/binfmt_misc/$BINFMT_ENTRY 2>/dev/null || true
-    fi
-}
-
-# Kill processes using the device node
-kill_device_users() {
-    local dev="$1"
-    local pids=$(lsof "$dev" 2>/dev/null | grep -v "^COMMAND" | awk '{print $2}' | sort -u)
-    if [ -n "$pids" ]; then
-        echo "Killing processes using $dev: $pids"
-        for pid in $pids; do
-            if [ "$pid" != "1" ] && [ "$pid" != "$$" ]; then
-                kill -TERM "$pid" 2>/dev/null || true
-            fi
-        done
-        sleep 1
-        for pid in $pids; do
-            if [ "$pid" != "1" ] && [ "$pid" != "$$" ] && kill -0 "$pid" 2>/dev/null; then
-                kill -KILL "$pid" 2>/dev/null || true
-            fi
-        done
-        sleep 0.5
-    fi
-}
-
-# Check if module is currently loaded
-check_loaded() {
-    lsmod 2>/dev/null | grep -q "^${module_name} "
-}
-
-# Check if module is disabled for next boot
-check_disabled() {
-    [ -f "$DISABLE_FILE" ] && grep -q "^${module_name}$" "$DISABLE_FILE"
-}
-
-# Enable module (load now + enable for next boot)
-enable_module() {
-    # Remove from disable list
-    if [ -f "$DISABLE_FILE" ]; then
-        grep -v "^${module_name}$" "$DISABLE_FILE" > "${DISABLE_FILE}.tmp" 2>/dev/null
-        mv "${DISABLE_FILE}.tmp" "$DISABLE_FILE" 2>/dev/null || true
-    fi
-    
-    # Load if not already loaded
-    if ! check_loaded; then
-        if [ -f "/vendor_dlkm/${module_name}.ko" ]; then
-            insmod "/vendor_dlkm/${module_name}.ko" 2>/dev/null || modprobe "$module_name" 2>/dev/null || true
+load_module() {
+    local mod="$1"
+    if ! is_loaded "$mod"; then
+        if [ -f "/vendor_dlkm/${mod}.ko" ]; then
+            insmod "/vendor_dlkm/${mod}.ko" 2>/dev/null || modprobe "$mod" 2>/dev/null
         else
-            modprobe "$module_name" 2>/dev/null || true
+            modprobe "$mod" 2>/dev/null
         fi
         sleep 0.5
     fi
-    
-    # Register binfmt_misc for tango32
-    if [ "$module_name" = "tango32" ] && check_loaded; then
-        register_binfmt
-    fi
-    
-    if check_loaded; then
-        echo "enabled"
-    else
-        echo "error"
-    fi
 }
 
-# Disable module (kill users, unload now + disable for next boot)
-disable_module() {
-    # Add to disable list
-    if ! check_disabled; then
-        echo "$module_name" >> "$DISABLE_FILE"
-    fi
-    
-    # Kill any processes using the device before unloading
-    [ -n "$dev_node" ] && [ -e "$dev_node" ] && kill_device_users "$dev_node"
-    
-    # Unregister binfmt_misc for tango32
-    if [ "$module_name" = "tango32" ]; then
-        unregister_binfmt
-    fi
-    
-    # Unload if loaded
-    if check_loaded; then
-        rmmod "$module_name" 2>/dev/null || rmmod -f "$module_name" 2>/dev/null || true
+unload_module() {
+    local mod="$1"
+    if is_loaded "$mod"; then
+        rmmod "$mod" 2>/dev/null || rmmod -f "$mod" 2>/dev/null || true
         sleep 0.3
     fi
-    
-    if ! check_loaded; then
+}
+
+mount_binfmt() {
+    if [ -d /proc/sys/fs/binfmt_misc ] && [ ! -f /proc/sys/fs/binfmt_misc/register ]; then
+        mount -t binfmt_misc none /proc/sys/fs/binfmt_misc 2>/dev/null || true
+    fi
+}
+
+register_binfmt() {
+    mount_binfmt
+    if [ -f /proc/sys/fs/binfmt_misc/register ]; then
+        if [ ! -f /proc/sys/fs/binfmt_misc/tango_translator ]; then
+            echo ':tango_translator:M::\x7fELF\x01\x01\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x02\x00\x28\x00:\xff\xff\xff\xff\xff\xff\xff\x00\x00\x00\x00\x00\x00\x00\x00\x00\xfe\xff\xff\xff:/system/bin/tango_translator:POCF' > /proc/sys/fs/binfmt_misc/register 2>/dev/null || true
+        fi
+        [ -f /proc/sys/fs/binfmt_misc/tango_translator ] && echo 1 > /proc/sys/fs/binfmt_misc/tango_translator 2>/dev/null || true
+    fi
+}
+
+unregister_binfmt() {
+    if [ -f /proc/sys/fs/binfmt_misc/tango_translator ]; then
+        echo -1 > /proc/sys/fs/binfmt_misc/tango_translator 2>/dev/null || true
+    fi
+}
+
+case "${1:-status}" in
+    enable|on)
+        echo "1" > "$STATE_FILE"
+        load_module "tango32"
+        load_module "ntsync"
+        register_binfmt
+        echo "enabled"
+        ;;
+    disable|off)
+        echo "0" > "$STATE_FILE"
+        unregister_binfmt
+        unload_module "tango32"
+        unload_module "ntsync"
         echo "disabled"
-    else
-        echo "error"
-    fi
-}
-
-# Get status
-get_status() {
-    if check_loaded; then
-        if check_disabled; then
-            echo "loaded-but-disabled"
-        else
-            echo "loaded"
-        fi
-    else
-        if check_disabled; then
-            echo "disabled"
-        else
-            echo "unloaded"
-        fi
-    fi
-}
-
-case "$ACTION" in
-    enable)
-        enable_module
         ;;
-    disable)
-        disable_module
-        ;;
-    status|*)
-        get_status
+    status)
+        if [ "$(cat "$STATE_FILE")" = "1" ]; then
+            if is_loaded "tango32"; then
+                echo "enabled"
+            else
+                echo "enabled (will load at boot)"
+            fi
+        else
+            if is_loaded "tango32"; then
+                echo "disabled (will unload at boot)"
+            else
+                echo "disabled"
+            fi
+        fi
         ;;
 esac

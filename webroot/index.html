@@ -17,74 +17,34 @@
         h1 { color: #4fc3f7; margin-bottom: 4px; font-size: 24px; }
         .subtitle { color: #666; margin-bottom: 24px; font-size: 14px; }
         
-        .module-card {
+        .status-card {
             background: #141414;
             border-radius: 16px;
-            padding: 20px;
+            padding: 24px;
             margin-bottom: 16px;
             border: 1px solid #222;
-        }
-        .module-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 16px;
-        }
-        .module-name { font-size: 18px; font-weight: 600; color: #fff; }
-        .module-desc { font-size: 13px; color: #888; margin-top: 2px; }
-        
-        .toggle-switch {
-            position: relative;
-            width: 56px;
-            height: 32px;
-        }
-        .toggle-switch input {
-            opacity: 0;
-            width: 0;
-            height: 0;
-        }
-        .slider {
-            position: absolute;
-            cursor: pointer;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background-color: #333;
-            transition: .3s;
-            border-radius: 32px;
-        }
-        .slider:before {
-            position: absolute;
-            content: "";
-            height: 24px;
-            width: 24px;
-            left: 4px;
-            bottom: 4px;
-            background-color: white;
-            transition: .3s;
-            border-radius: 50%;
-        }
-        input:checked + .slider { background-color: #4caf50; }
-        input:checked + .slider:before { transform: translateX(24px); }
-        input:disabled + .slider { opacity: 0.5; cursor: not-allowed; }
-        
-        .status-row { display: flex; gap: 16px; }
-        .status-item {
-            flex: 1;
-            background: #1a1a1a;
-            border-radius: 10px;
-            padding: 12px;
             text-align: center;
         }
-        .status-label {
-            font-size: 11px;
-            text-transform: uppercase;
-            color: #666;
-            margin-bottom: 4px;
-            letter-spacing: 0.5px;
-        }
-        .status-value { font-size: 15px; font-weight: 600; }
+        .status-text { font-size: 32px; font-weight: 600; margin-bottom: 8px; }
         .status-on { color: #4caf50; }
         .status-off { color: #f44336; }
-        .status-warn { color: #ff9800; }
+        .status-desc { color: #888; font-size: 14px; }
+        
+        .btn {
+            width: 100%;
+            padding: 16px;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-bottom: 12px;
+            transition: opacity 0.2s;
+        }
+        .btn:active { opacity: 0.8; }
+        .btn-enable { background: #4caf50; color: white; }
+        .btn-disable { background: #f44336; color: white; }
+        .btn-disabled { opacity: 0.5; cursor: not-allowed; }
         
         .info-card {
             background: #141414;
@@ -92,13 +52,6 @@
             padding: 20px;
             margin-top: 16px;
             border: 1px solid #222;
-        }
-        .info-title {
-            font-size: 12px;
-            text-transform: uppercase;
-            color: #666;
-            margin-bottom: 12px;
-            letter-spacing: 1px;
         }
         .info-text {
             font-size: 14px;
@@ -109,28 +62,9 @@
             background: #1f1f1f;
             padding: 2px 8px;
             border-radius: 6px;
-            font-family: 'SF Mono', 'Courier New', monospace;
+            font-family: monospace;
             font-size: 12px;
             color: #4fc3f7;
-        }
-        .divider {
-            height: 1px;
-            background: #222;
-            margin: 16px 0;
-        }
-        #log-output {
-            font-family: 'SF Mono', 'Courier New', monospace;
-            font-size: 12px;
-            line-height: 1.5;
-            color: #888;
-            white-space: pre-wrap;
-            word-break: break-all;
-            max-height: 150px;
-            overflow-y: auto;
-            background: #0d0d0d;
-            padding: 12px;
-            border-radius: 8px;
-            margin-top: 12px;
         }
     </style>
 </head>
@@ -139,65 +73,23 @@
         <h1>Tango Binary Translator</h1>
         <p class="subtitle">Run ARM32 binaries on ARM64-only devices</p>
 
-        <div class="module-card">
-            <div class="module-header">
-                <div>
-                    <div class="module-name">tango32</div>
-                    <div class="module-desc">ARM32 syscall translation + binfmt_misc</div>
-                </div>
-                <label class="toggle-switch">
-                    <input type="checkbox" id="toggle-tango32" onchange="toggleModule('tango32')">
-                    <span class="slider"></span>
-                </label>
-            </div>
-            <div class="status-row">
-                <div class="status-item">
-                    <div class="status-label">Current</div>
-                    <div id="status-tango32-current" class="status-value status-off">—</div>
-                </div>
-                <div class="status-item">
-                    <div class="status-label">Next Boot</div>
-                    <div id="status-tango32-boot" class="status-value status-off">—</div>
-                </div>
-            </div>
+        <div class="status-card">
+            <div id="status-text" class="status-text status-off">OFF</div>
+            <div class="status-desc">Tap button to toggle</div>
         </div>
 
-        <div class="module-card">
-            <div class="module-header">
-                <div>
-                    <div class="module-name">ntsync</div>
-                    <div class="module-desc">Windows sync primitives for Wine/Proton</div>
-                </div>
-                <label class="toggle-switch">
-                    <input type="checkbox" id="toggle-ntsync" onchange="toggleModule('ntsync')">
-                    <span class="slider"></span>
-                </label>
-            </div>
-            <div class="status-row">
-                <div class="status-item">
-                    <div class="status-label">Current</div>
-                    <div id="status-ntsync-current" class="status-value status-off">—</div>
-                </div>
-                <div class="status-item">
-                    <div class="status-label">Next Boot</div>
-                    <div id="status-ntsync-boot" class="status-value status-off">—</div>
-                </div>
-            </div>
-        </div>
+        <button id="btn-toggle" class="btn btn-enable" onclick="toggle()">Enable</button>
 
         <div class="info-card">
-            <div class="info-title">Usage</div>
             <div class="info-text">
-                <p><strong>ARM32 CLI:</strong> <code>tango /path/to/arm32-binary [args...]</code></p>
-                <p><strong>Direct:</strong> Run ARM32 binaries directly when tango32 is enabled</p>
-                <p><strong>Pretranslate:</strong> <code>tango-pretranslate --apk -i &lt;bin&gt; -o &lt;bin&gt;.tango</code></p>
-                <div class="divider"></div>
-                <p style="color:#666;font-size:12px;">
-                    Both modules auto-load at boot by default. Toggle off to unload and skip next boot. 
-                    Toggle on to load instantly and enable for next boot.
+                <p><strong>Status:</strong> <span id="status-detail">Checking...</span></p>
+                <p style="margin-top:8px"><strong>Usage:</strong></p>
+                <p><code>tango /path/to/arm32-binary</code></p>
+                <p style="margin-top:8px; color:#666; font-size:12px;">
+                    Enable to load tango32 + ntsync modules and register binfmt_misc.
+                    Disable to unload modules. State persists after reboot.
                 </p>
             </div>
-            <div id="log-output">Ready...</div>
         </div>
     </div>
 
@@ -206,108 +98,56 @@
 
         async function runCmd(cmd) {
             try {
-                const { errno, stdout, stderr } = await exec(cmd);
-                return { ok: errno === 0, out: stdout || stderr || `code ${errno}` };
+                const { errno, stdout } = await exec(cmd);
+                return { ok: errno === 0, out: stdout || '' };
             } catch (e) {
-                return { ok: false, out: e.message || 'Unknown error' };
+                return { ok: false, out: e.message };
             }
         }
 
-        function setText(id, text, cls) {
-            const el = document.getElementById(id);
-            if (el) {
-                el.textContent = text;
-                el.className = 'status-value ' + (cls || '');
-            }
-        }
-
-        function log(msg) {
-            document.getElementById('log-output').textContent = msg;
-        }
-
-        async function refreshStatus() {
-            log('Checking status...');
-
-            // tango32
-            const t32 = await runCmd('/system/bin/module-toggle tango32 status');
-            const t32st = t32.out.trim();
+        async function refresh() {
+            const result = await runCmd('/system/bin/module-toggle status');
+            const status = result.out.trim();
+            const isEnabled = status === 'enabled' || status.includes('will load');
             
-            log(`tango32 status: ${t32st} (ok=${t32.ok})`);
+            const btn = document.getElementById('btn-toggle');
+            const statusText = document.getElementById('status-text');
+            const statusDetail = document.getElementById('status-detail');
             
-            // Checkbox: checked if enabled for next boot (not disabled)
-            const t32Enabled = t32st !== 'disabled' && t32st !== 'loaded-but-disabled';
-            document.getElementById('toggle-tango32').checked = t32Enabled;
-            
-            if (t32st === 'loaded') {
-                setText('status-tango32-current', 'Loaded', 'status-on');
-                setText('status-tango32-boot', 'Will Load', 'status-on');
-            } else if (t32st === 'disabled') {
-                setText('status-tango32-current', 'Unloaded', 'status-off');
-                setText('status-tango32-boot', "Won't Load", 'status-off');
-            } else if (t32st === 'loaded-but-disabled') {
-                setText('status-tango32-current', 'Loaded', 'status-on');
-                setText('status-tango32-boot', "Won't Load", 'status-warn');
-            } else if (t32st === 'unloaded') {
-                setText('status-tango32-current', 'Unloaded', 'status-off');
-                setText('status-tango32-boot', 'Will Load', 'status-on');
+            if (isEnabled) {
+                btn.textContent = 'Disable';
+                btn.className = 'btn btn-disable';
+                statusText.textContent = 'ON';
+                statusText.className = 'status-text status-on';
             } else {
-                // Unknown status - show error
-                setText('status-tango32-current', 'Error', 'status-off');
-                setText('status-tango32-boot', 'Unknown', 'status-off');
-                log(`tango32: unexpected status "${t32st}"`);
+                btn.textContent = 'Enable';
+                btn.className = 'btn btn-enable';
+                statusText.textContent = 'OFF';
+                statusText.className = 'status-text status-off';
             }
-
-            // ntsync
-            const nts = await runCmd('/system/bin/module-toggle ntsync status');
-            const ntsst = nts.out.trim();
             
-            log(`ntsync status: ${ntsst} (ok=${nts.ok})`);
-            
-            const ntsEnabled = ntsst !== 'disabled' && ntsst !== 'loaded-but-disabled';
-            document.getElementById('toggle-ntsync').checked = ntsEnabled;
-            
-            if (ntsst === 'loaded') {
-                setText('status-ntsync-current', 'Loaded', 'status-on');
-                setText('status-ntsync-boot', 'Will Load', 'status-on');
-            } else if (ntsst === 'disabled') {
-                setText('status-ntsync-current', 'Unloaded', 'status-off');
-                setText('status-ntsync-boot', "Won't Load", 'status-off');
-            } else if (ntsst === 'loaded-but-disabled') {
-                setText('status-ntsync-current', 'Loaded', 'status-on');
-                setText('status-ntsync-boot', "Won't Load", 'status-warn');
-            } else if (ntsst === 'unloaded') {
-                setText('status-ntsync-current', 'Unloaded', 'status-off');
-                setText('status-ntsync-boot', 'Will Load', 'status-on');
-            } else {
-                setText('status-ntsync-current', 'Error', 'status-off');
-                setText('status-ntsync-boot', 'Unknown', 'status-off');
-                log(`ntsync: unexpected status "${ntsst}"`);
-            }
+            statusDetail.textContent = status;
         }
 
-        window.toggleModule = async function(name) {
-            const checkbox = document.getElementById('toggle-' + name);
-            checkbox.disabled = true;
+        window.toggle = async function() {
+            const btn = document.getElementById('btn-toggle');
+            btn.disabled = true;
             
-            const action = checkbox.checked ? 'enable' : 'disable';
-            log(`${action === 'enable' ? 'Loading' : 'Unloading'} ${name}...`);
-            
-            const result = await runCmd(`/system/bin/module-toggle ${name} ${action}`);
-            log(result.out);
+            const action = btn.textContent === 'Enable' ? 'enable' : 'disable';
+            const result = await runCmd(`/system/bin/module-toggle ${action}`);
             
             if (result.ok) {
-                toast(`${name} ${action}d`);
+                toast(`${action}d`);
             } else {
-                toast(`Failed to ${action} ${name}`);
-                checkbox.checked = !checkbox.checked;
+                toast(`Failed: ${result.out}`);
             }
             
-            checkbox.disabled = false;
-            await refreshStatus();
+            btn.disabled = false;
+            await refresh();
         };
 
-        // Initial refresh with delay to ensure DOM is ready
-        setTimeout(refreshStatus, 100);
+        // Initial refresh
+        setTimeout(refresh, 100);
     </script>
 </body>
 </html>
