@@ -4,4 +4,4 @@ version=v3.0.0
 versionCode=3000
 author=Amanieu d'Antras
 minKernelVersion=5.6
-description=Auto-enables ARM32 binary translation on boot via binfmt_misc. Just works - no toggles needed.
+description=Auto-enables ARM32 binary translation on boot. No settings, no toggles - just works. Disable via KernelSU Manager if needed.
