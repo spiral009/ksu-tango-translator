@@ -1,12 +1,7 @@
 id=tango-translator
 name=Tango Binary Translator
-version=v2.2.0
-versionCode=2200
+version=v3.0.0
+versionCode=3000
 author=Amanieu d'Antras
 minKernelVersion=5.6
-description=KernelSU module for Tango binary translator - enables ARM32 CLI tools on ARM64-only devices
-
-# Simple ON/OFF toggle with persistence
-# Enable: loads tango32 + ntsync modules, registers binfmt_misc
-# Disable: unloads modules, unregisters binfmt_misc
-# State persists across reboots
+description=Auto-enables ARM32 binary translation on boot via binfmt_misc. Just works - no toggles needed.

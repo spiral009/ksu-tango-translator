@@ -1,75 +1,24 @@
 #!/system/bin/sh
-# Tango Binary Translator - Simple Service Script
-# Loads/unloads modules based on enabled state
+# Tango Binary Translator - v3.0
+# Just works: mounts binfmt_misc, registers tango, loads modules
 
 MODDIR=${0%/*}
-STATE_FILE="/data/adb/tango-modules/enabled"
 
-# Create state file if missing (default: disabled)
-mkdir -p "$(dirname "$STATE_FILE")"
-[ -f "$STATE_FILE" ] || echo "0" > "$STATE_FILE"
+# Mount binfmt_misc
+if [ ! -f /proc/sys/fs/binfmt_misc/register ]; then
+    mount -t binfmt_misc none /proc/sys/fs/binfmt_misc 2>/dev/null || true
+fi
 
-is_enabled() {
-    [ -f "$STATE_FILE" ] && [ "$(cat "$STATE_FILE")" = "1" ]
-}
-
-is_loaded() {
-    lsmod 2>/dev/null | grep -q "^$1 "
-}
-
-load_module() {
-    local mod="$1"
-    if ! is_loaded "$mod"; then
-        if [ -f "/vendor_dlkm/${mod}.ko" ]; then
-            insmod "/vendor_dlkm/${mod}.ko" 2>/dev/null || modprobe "$mod" 2>/dev/null
-        else
-            modprobe "$mod" 2>/dev/null
-        fi
-        sleep 0.5
+# Register ARM32 ELF handler
+if [ -f /proc/sys/fs/binfmt_misc/register ]; then
+    if [ ! -f /proc/sys/fs/binfmt_misc/tango_translator ]; then
+        echo ':tango_translator:M::\x7fELF\x01\x01\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x02\x00\x28\x00:\xff\xff\xff\xff\xff\xff\xff\x00\x00\x00\x00\x00\x00\x00\x00\x00\xfe\xff\xff\xff:/system/bin/tango_translator:POCF' > /proc/sys/fs/binfmt_misc/register 2>/dev/null || true
     fi
-}
+    [ -f /proc/sys/fs/binfmt_misc/tango_translator ] && echo 1 > /proc/sys/fs/binfmt_misc/tango_translator 2>/dev/null || true
+fi
 
-unload_module() {
-    local mod="$1"
-    if is_loaded "$mod"; then
-        rmmod "$mod" 2>/dev/null || rmmod -f "$mod" 2>/dev/null || true
-        sleep 0.3
-    fi
-}
+# Load kernel modules
+insmod /vendor_dlkm/tango32.ko 2>/dev/null || modprobe tango32 2>/dev/null || true
+insmod /vendor_dlkm/ntsync.ko 2>/dev/null || modprobe ntsync 2>/dev/null || true
 
-mount_binfmt() {
-    if [ -d /proc/sys/fs/binfmt_misc ] && [ ! -f /proc/sys/fs/binfmt_misc/register ]; then
-        mount -t binfmt_misc none /proc/sys/fs/binfmt_misc 2>/dev/null || true
-    fi
-}
-
-register_binfmt() {
-    mount_binfmt
-    if [ -f /proc/sys/fs/binfmt_misc/register ]; then
-        if [ ! -f /proc/sys/fs/binfmt_misc/tango_translator ]; then
-            echo ':tango_translator:M::\x7fELF\x01\x01\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x02\x00\x28\x00:\xff\xff\xff\xff\xff\xff\xff\x00\x00\x00\x00\x00\x00\x00\x00\x00\xfe\xff\xff\xff:/system/bin/tango_translator:POCF' > /proc/sys/fs/binfmt_misc/register 2>/dev/null || true
-        fi
-        [ -f /proc/sys/fs/binfmt_misc/tango_translator ] && echo 1 > /proc/sys/fs/binfmt_misc/tango_translator 2>/dev/null || true
-    fi
-}
-
-unregister_binfmt() {
-    if [ -f /proc/sys/fs/binfmt_misc/tango_translator ]; then
-        echo -1 > /proc/sys/fs/binfmt_misc/tango_translator 2>/dev/null || true
-    fi
-}
-
-# Main
-case "$1" in
-    post-fs-data)
-        if is_enabled; then
-            load_module "tango32"
-            load_module "ntsync"
-            register_binfmt
-        else
-            unregister_binfmt
-            unload_module "tango32"
-            unload_module "ntsync"
-        fi
-        ;;
-esac
+# All done - ARM32 binaries now run transparently
